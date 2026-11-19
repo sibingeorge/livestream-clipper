@@ -43,6 +43,9 @@ discover ─► rights gate ─► capture (yt-dlp | ffmpeg, 30 s segments, wall
 | Quality validation | `validate.py` |
 | Review queue | `review.py`, `web.py` (localhost dashboard), CLI |
 | Metadata generation | `metadata.py` |
+| Email delivery | `mailer.py` (SMTP from env; outbox table with dedupe, daily cap, min score, retry/backoff, size fitting) |
+| Background service | `daemon.py` (supervised Runner + Mailer, heartbeat for health checks), `deploy/`, `Dockerfile` |
+| Allowlist discovery | `discovery/allowed.py` (polls permitted channels for "live now") |
 | Logging / Config / Storage | `log.py`, `config.py` (TOML, typo-checked), `db.py` (SQLite, WAL) |
 
 ## How it works without paid APIs
@@ -91,6 +94,12 @@ added later behind `story.build_story` without touching the rest.
 | ffmpeg compose failure | retried up to 3 times, then `failed` with error text |
 | Bad output (silent, black, wrong size, music-heavy) | QC marks `rejected_qc`; never enters the review queue |
 | Disk growth | rolling buffer pruned after `retention_minutes`; candidate footage is protected |
+
+## Delivery & operations notes
+* Email goes through SMTP (iCloud/Gmail app password), because Claude's mailbox connectors only exist inside a Claude session.
+* A clip is mailed at most once (`outbox` primary key); failed sends retry up to 12 times with exponential backoff.
+* Clips are mailed only after QC passed and score >= `email.min_score`, capped at `email.max_per_day`.
+* Virality is a *heuristic* (simultaneous chat + loudness spike, hype words, author diversity). It does not predict views or revenue.
 
 ## Not implemented (by design for the MVP)
 Automatic publishing; a local LLM; per-game event detectors (GTA 6-specific logic is limited to topic keywords);

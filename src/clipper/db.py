@@ -46,6 +46,10 @@ CREATE TABLE IF NOT EXISTS clips (
   id INTEGER PRIMARY KEY, candidate_id INTEGER, stream_id INTEGER,
   path TEXT, title TEXT, status TEXT NOT NULL DEFAULT 'draft',  -- draft|review|rejected_qc|approved|rejected|needs_edit
   quality TEXT, meta_path TEXT, created_at REAL NOT NULL, reviewed_at REAL, review_note TEXT);
+CREATE TABLE IF NOT EXISTS outbox (          -- email delivery queue (one row per clip)
+  clip_id INTEGER PRIMARY KEY REFERENCES clips(id), status TEXT NOT NULL DEFAULT 'queued', -- queued|sent|failed|skipped
+  attempts INTEGER NOT NULL DEFAULT 0, next_try REAL NOT NULL DEFAULT 0, last_error TEXT,
+  queued_at REAL NOT NULL, sent_at REAL);
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY, ts REAL NOT NULL, level TEXT, component TEXT, message TEXT, stream_id INTEGER);
 """

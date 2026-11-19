@@ -2,7 +2,28 @@
 data_dir = "data"          # db, buffer, logs, work files
 clips_dir = "clips"        # review-ready drafts
 
+# Channels you have permission to clip. Default-deny: nothing else is ever recorded.
+# `basis` is required: owned | written-permission | licensed | creator-program | other
+# YouTube channel_id is the UC... id or an @handle; Twitch channel_id is the login name.
+[[rights.allow]]
+platform = "youtube"
+channel_id = "UCxxxxxxxxxxxxxxxxxxxxxx"
+name = "Example creator"
+basis = "written-permission"
+note = "email from creator, 2026-11-01"
+
+[email]                    # recipient and SMTP password are in .env, not here
+enabled = true
+min_score = 0.5            # only mail clips at least this promising
+max_per_day = 20
+max_attachment_mb = 18
+
+[daemon]
+max_streams = 2            # concurrent live streams recorded
+
 [discovery]
+mode = "allowlist"         # "allowlist" (automatic, permitted channels) | "trending" (search too; still rights-gated)
+interval_seconds = 120
 queries = ["GTA 6", "GTA VI", "Grand Theft Auto 6"]
 max_candidates = 10
 min_viewers = 0

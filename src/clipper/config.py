@@ -1,6 +1,7 @@
 """Configuration: dataclass defaults, optionally overridden by a TOML file."""
 from __future__ import annotations
 
+import os
 import tomllib
 from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
@@ -12,6 +13,10 @@ class DiscoveryCfg:
     queries: list[str] = field(default_factory=lambda: ["GTA 6", "GTA VI", "Grand Theft Auto 6"])
     max_candidates: int = 10
     min_viewers: int = 0
+    # allowlist: poll the channels you have permission for (recommended, fully automatic).
+    # trending: search trending/most-viewed live streams; still gated by the allowlist.
+    mode: str = "allowlist"
+    interval_seconds: int = 120
 
 
 @dataclass
@@ -74,6 +79,28 @@ class ReviewCfg:
 
 
 @dataclass
+class RightsCfg:
+    # [[rights.allow]] platform = "youtube", channel_id = "UC...", basis = "written-permission", note = "..."
+    allow: list[dict] = field(default_factory=list)
+
+
+@dataclass
+class EmailCfg:
+    """Recipient/limits only. SMTP credentials come from the environment (.env), never from config."""
+    enabled: bool = True
+    min_score: float = 0.5        # only email clips at least this promising
+    max_per_day: int = 20         # protects your mailbox
+    max_attachment_mb: float = 18.0  # iCloud/Gmail cap ~20-25 MB; larger clips are re-encoded to fit
+    send_interval_seconds: int = 30
+
+
+@dataclass
+class DaemonCfg:
+    max_streams: int = 2
+    restart_backoff_seconds: int = 15
+
+
+@dataclass
 class Config:
     data_dir: Path = Path("data")
     clips_dir: Path = Path("clips")
@@ -85,6 +112,9 @@ class Config:
     asr: AsrCfg = field(default_factory=AsrCfg)
     quality: QualityCfg = field(default_factory=QualityCfg)
     review: ReviewCfg = field(default_factory=ReviewCfg)
+    rights: RightsCfg = field(default_factory=RightsCfg)
+    email: EmailCfg = field(default_factory=EmailCfg)
+    daemon: DaemonCfg = field(default_factory=DaemonCfg)
 
     @property
     def db_path(self) -> Path:
@@ -97,6 +127,10 @@ class Config:
     @property
     def work_dir(self) -> Path:
         return self.data_dir / "work"
+
+    @property
+    def heartbeat_path(self) -> Path:
+        return self.data_dir / "heartbeat"
 
     @property
     def log_dir(self) -> Path:
@@ -126,7 +160,21 @@ def _merge(obj: Any, data: dict[str, Any], path: str = "") -> None:
             setattr(obj, key, val)
 
 
+def load_dotenv(path: str | Path = ".env") -> None:
+    """Minimal .env loader (KEY=VALUE lines). Real environment variables win."""
+    p = Path(path)
+    if not p.exists():
+        return
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
+
+
 def load_config(path: str | Path | None = None) -> Config:
+    load_dotenv()
     cfg = Config()
     p = Path(path) if path else Path("config.toml")
     if p.exists():

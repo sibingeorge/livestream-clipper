@@ -1,0 +1,12 @@
+services:
+  clipper:
+    build: .
+    restart: unless-stopped
+    env_file: .env                 # SMTP_* and MAIL_TO live here (git-ignored)
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./data:/app/data           # database, rolling buffer, logs, whisper model cache
+      - ./clips:/app/clips         # drafts: review/ approved/ rejected/
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

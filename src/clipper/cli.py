@@ -35,6 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--max-streams", type=int, default=1)
     run.add_argument("--once", action="store_true", help="exit when no stream is active")
 
+    sub.add_parser("daemon", help="run forever: find live streams, clip them, email the results")
+    sub.add_parser("mail-test", help="send a test email to verify SMTP settings")
+    sub.add_parser("outbox", help="show email delivery status")
+    sub.add_parser("health", help="exit 0 if the daemon loop is alive (for Docker/systemd health checks)")
+    sub.add_parser("status", help="show streams, candidates, clips and email queue")
+
     f = sub.add_parser("process-file", help="run the full pipeline on a local recording (+ optional chat log)")
     f.add_argument("video")
     f.add_argument("--chat-log", help="JSON-lines: {t, author, text}")
@@ -55,6 +61,41 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(cfg.log_dir)
     db = Database(cfg.db_path)
 
+    from .rights import sync_config
+    sync_config(db, cfg.rights.allow)
+
+    if a.cmd == "daemon":
+        from .daemon import run_daemon
+        return run_daemon(cfg, db)
+    if a.cmd == "health":
+        import time
+        try:
+            age = time.time() - float(cfg.heartbeat_path.read_text())
+        except (OSError, ValueError):
+            print("no heartbeat", file=sys.stderr)
+            return 1
+        print(f"heartbeat {age:.0f}s ago")
+        return 0 if age < 300 else 1
+    if a.cmd == "mail-test":
+        from .mailer import send_test
+        try:
+            send_test()
+        except Exception as e:  # noqa: BLE001
+            print(f"FAILED: {e}", file=sys.stderr)
+            return 1
+        print("test email sent")
+        return 0
+    if a.cmd == "outbox":
+        for r in db.query("SELECT * FROM outbox ORDER BY clip_id DESC LIMIT 50"):
+            print(f"clip #{r['clip_id']:<4} {r['status']:8} attempts={r['attempts']} {r['last_error'] or ''}")
+        return 0
+    if a.cmd == "status":
+        for t, q in (("streams", "SELECT state k, COUNT(*) n FROM streams GROUP BY state"),
+                     ("candidates", "SELECT status k, COUNT(*) n FROM candidates GROUP BY status"),
+                     ("clips", "SELECT status k, COUNT(*) n FROM clips GROUP BY status"),
+                     ("outbox", "SELECT status k, COUNT(*) n FROM outbox GROUP BY status")):
+            print(f"{t:10}", {r["k"]: r["n"] for r in db.query(q)})
+        return 0
     if a.cmd == "doctor":
         hw = detect_hardware()
         print(json.dumps(hw.as_dict(), indent=2))

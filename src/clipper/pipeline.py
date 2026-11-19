@@ -116,8 +116,10 @@ def tick_stream(db: Database, cfg: Config, buf: Buffer, chat_available: bool = T
 class Runner:
     """Live loop: discover -> rights gate -> capture + chat -> analyse -> drafts, while streams are live."""
 
-    def __init__(self, cfg: Config, db: Database, max_streams: int = 1, rediscover_s: int = 300):
-        self.cfg, self.db, self.max_streams, self.rediscover_s = cfg, db, max_streams, rediscover_s
+    def __init__(self, cfg: Config, db: Database, max_streams: int | None = None, rediscover_s: int | None = None):
+        self.cfg, self.db = cfg, db
+        self.max_streams = max_streams or cfg.daemon.max_streams
+        self.rediscover_s = rediscover_s or cfg.discovery.interval_seconds
         self.active: dict[int, tuple[Capture, ChatIngestor, Buffer]] = {}
         self.stop_evt = threading.Event()
 
@@ -147,6 +149,25 @@ class Runner:
                         (reason, time.time(), sid))
         log.info("stream %s finished: %s", sid, reason)
 
+    def _discover(self):
+        """allowlist mode polls only channels you have permission for; trending mode also searches
+        popular live streams (everything is still passed through the rights gate afterwards)."""
+        from .discovery.allowed import discover_allowed
+        found = []
+        try:
+            found += discover_allowed(self.cfg, self.db)
+        except Exception as e:  # noqa: BLE001
+            log.warning("allowlist discovery failed: %s", e)
+        if self.cfg.discovery.mode == "trending":
+            found += discover_all(self.cfg)
+        return found
+
+    def _heartbeat(self) -> None:
+        try:
+            self.cfg.heartbeat_path.write_text(str(time.time()))
+        except OSError:
+            pass
+
     def run(self, once: bool = False) -> None:
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
@@ -155,13 +176,14 @@ class Runner:
                 pass  # not main thread
         last_disc = 0.0
         while not self.stop_evt.is_set():
+            self._heartbeat()
             if time.time() - last_disc > self.rediscover_s and len(self.active) < self.max_streams:
                 last_disc = time.time()
-                found = discover_all(self.cfg)
+                found = self._discover()
                 res = register_streams(self.db, found)
                 if found and not any(ok for _, ok, _ in res):
                     log.warning("found %d live streams but none are on the rights allowlist "
-                                "(`clipper rights allow ...`)", len(found))
+                                "(add [[rights.allow]] entries to config.toml)", len(found))
                 for sid, ok, _ in res:
                     if ok and sid not in self.active and len(self.active) < self.max_streams:
                         self._start(sid)

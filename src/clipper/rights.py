@@ -60,3 +60,26 @@ def check_source(db: Database, platform: str, channel_id: str | None,
     if meta.get("is_live") is False:
         return Decision(False, "not live")
     return Decision(True, "allow-listed", row["basis"])
+
+
+def sync_config(db: Database, entries: list[dict]) -> int:
+    """Load [[rights.allow]] entries from config. Invalid entries are skipped (logged), and a source
+    you explicitly denied in the database is never silently re-allowed by the config file."""
+    from .log import get_logger
+    log = get_logger("rights")
+    n = 0
+    for e in entries or []:
+        try:
+            platform, cid = str(e["platform"]).lower(), str(e["channel_id"])
+            if platform not in ("youtube", "twitch"):
+                raise ValueError(f"unsupported platform {platform}")
+            row = db.one("SELECT status FROM sources WHERE platform=? AND channel_id=?", (platform, cid))
+            if row and row["status"] == "denied":
+                log.warning("config allows %s:%s but it is denied in the database; keeping denied", platform, cid)
+                continue
+            set_source(db, platform, cid, "allowed", name=str(e.get("name", "")),
+                       basis=str(e.get("basis", "")), note=str(e.get("note", "")))
+            n += 1
+        except (KeyError, ValueError) as ex:
+            log.error("ignoring invalid [[rights.allow]] entry %r: %s", e, ex)
+    return n

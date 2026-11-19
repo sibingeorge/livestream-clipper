@@ -171,9 +171,52 @@ def test_validation_rejects_bad_clips(cfg, tmp_path):
     assert not rep.ok and "duration" in text and "resolution" in text and "black" in text and "quiet" in text
 
 
-def test_runner_without_allowlisted_streams_exits_cleanly(cfg, db, monkeypatch):
+def test_runner_trending_mode_still_default_denies(cfg, db, monkeypatch):
     from clipper import pipeline
     from clipper.discovery.base import StreamInfo
+    cfg.discovery.mode = "trending"
     monkeypatch.setattr(pipeline, "discover_all", lambda c: [StreamInfo("youtube", "v1", "u", channel_id="UCx")])
-    pipeline.Runner(cfg, db).run(once=True)          # default-deny: nothing recorded
-    assert db.one("SELECT state FROM streams")["state"] == "blocked"
+    started = []
+    monkeypatch.setattr(pipeline.Runner, "_start", lambda self, sid: started.append(sid))
+    pipeline.Runner(cfg, db).run(once=True)          # not on the allowlist: never recorded
+    assert db.one("SELECT state FROM streams")["state"] == "blocked" and started == []
+
+
+def test_runner_allowlist_mode_starts_only_permitted_live_channels(cfg, db, monkeypatch):
+    from clipper import pipeline, rights
+    from clipper.discovery.base import StreamInfo
+    rights.set_source(db, "youtube", "UCok", "allowed", basis="owned")
+    live = [StreamInfo("youtube", "v1", "u", channel_id="UCok", meta={"is_live": True}),
+            StreamInfo("youtube", "v2", "u", channel_id="UCother", meta={"is_live": True})]
+    monkeypatch.setattr("clipper.discovery.allowed.discover_allowed", lambda c, d: live)
+    started = []
+    monkeypatch.setattr(pipeline.Runner, "_start", lambda self, sid: started.append(sid))
+    pipeline.Runner(cfg, db).run(once=True)
+    states = {r["video_id"]: r["state"] for r in db.query("SELECT * FROM streams")}
+    assert states == {"v1": "discovered", "v2": "blocked"} and len(started) == 1
+
+
+def test_real_clip_is_emailed_end_to_end(processed):
+    from clipper import mailer
+    cfg, db, ids = processed
+    cfg.email.min_score = 0.5
+
+    class Fake:
+        sent = []
+
+        def send_message(self, m):
+            self.sent.append(m)
+
+        def quit(self):
+            pass
+
+    f = Fake()
+    s = mailer.SmtpSettings("h", 587, "u", "p", "u@x", "dest@x")
+    assert mailer.enqueue_new(db, cfg) == 1
+    assert mailer.send_pending(db, cfg, s, lambda _s: f) == 1
+    msg = f.sent[0]
+    atts = {a.get_filename(): a for a in msg.iter_attachments()}
+    assert set(atts) == {f"{ids[0]:05d}.mp4", f"{ids[0]:05d}.json"}
+    assert len(atts[f"{ids[0]:05d}.mp4"].get_content()) > 100_000       # real video bytes
+    body = msg.get_body().get_content()
+    assert "Rights basis on file: owned" in body and "HASHTAGS: #GTA6" in body and "score 0." in msg["Subject"]
