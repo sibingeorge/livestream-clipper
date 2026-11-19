@@ -1,0 +1,51 @@
+# Copy to config.toml (git-ignored) and edit.
+data_dir = "data"          # db, buffer, logs, work files
+clips_dir = "clips"        # review-ready drafts
+
+[discovery]
+queries = ["GTA 6", "GTA VI", "Grand Theft Auto 6"]
+max_candidates = 10
+min_viewers = 0
+
+[capture]
+segment_seconds = 30
+max_height = 720
+retention_minutes = 20     # rolling buffer; candidate footage is protected
+latency_offset_seconds = 0 # shift stream time vs chat wall-clock if drift is measured
+
+[detection]
+window_seconds = 10
+baseline_windows = 30      # 5 min of history
+min_baseline_windows = 12
+chat_z = 3.0
+loud_z = 2.5
+min_chat_messages = 5
+min_loudness_db = -40.0
+cooldown_seconds = 45
+audio_only_fallback = false  # if chat is unavailable, require a stronger audio spike
+audio_only_loud_z = 5.0
+
+[clip]
+pre_roll = 20
+length = 30
+width = 1080
+height = 1920
+
+[scoring]
+min_score = 0.45
+hype_words = ["omg", "wtf", "insane", "no way", "lets go", "clip", "clip it", "holy", "crazy", "bro"]
+topic_words = ["gta", "trailer", "leak", "vice city", "lucia", "jason", "rockstar", "release", "gameplay"]
+
+[asr]
+enabled = true
+model = "auto"             # auto = picked from detected hardware
+language = "en"
+
+[quality]
+max_music_likelihood = 0.7
+min_mean_volume_db = -45.0
+max_black_ratio = 0.5
+
+[review]
+host = "127.0.0.1"
+port = 8765
