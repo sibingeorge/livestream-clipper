@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .audio import decode_pcm
 from .config import AsrCfg
 from .hardware import detect_hardware
 from .log import get_logger
@@ -41,9 +42,15 @@ def transcribe(path: str, cfg: AsrCfg) -> list[Word]:
         if key not in _MODEL:
             log.info("loading whisper %s on %s (%s)", name, device, compute)
             _MODEL[key] = WhisperModel(name, device=device, compute_type=compute)
-        segs, _ = _MODEL[key].transcribe(path, language=cfg.language or None, word_timestamps=True,
+        # Decode with ffmpeg ourselves: faster-whisper's own PyAV decoder breaks on newer PyAV releases
+        # (TypeError: open() got an unexpected keyword argument 'metadata_errors').
+        pcm = decode_pcm(path)
+        if pcm.size == 0:
+            log.warning("no decodable audio in %s; skipping captions", path)
+            return []
+        segs, _ = _MODEL[key].transcribe(pcm, language=cfg.language or None, word_timestamps=True,
                                          vad_filter=True, beam_size=1)
-        return [Word(w.start, w.end, w.word.strip()) for s in segs for w in (s.words or []) if w.word.strip()]
+        return [Word(float(w.start), float(w.end), w.word.strip()) for s in segs for w in (s.words or []) if w.word.strip()]
     except Exception as e:  # noqa: BLE001
         log.error("transcription failed: %s", e)
         return []

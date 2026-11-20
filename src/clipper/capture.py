@@ -27,7 +27,8 @@ def segment_cmd(out_dir: Path, seconds: int) -> list[str]:
 
 def ytdlp_cmd(url: str, max_height: int) -> list[str]:
     fmt = f"best[height<={max_height}]/bestvideo[height<={max_height}]+bestaudio/best"
-    return ["yt-dlp", "-q", "--no-warnings", "-f", fmt, "--no-part", "-o", "-", url]
+    from .ytdlp_opts import cli_args
+    return ["yt-dlp", "-q", "--no-warnings", *cli_args(), "-f", fmt, "--no-part", "-o", "-", url]
 
 
 class Capture:

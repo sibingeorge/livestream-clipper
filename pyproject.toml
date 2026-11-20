@@ -7,7 +7,7 @@ name = "clipper"
 version = "0.2.0"
 description = "Local-first live-stream moment detector and Shorts draft studio (no paid APIs)"
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26", "yt-dlp>=2024.8.6"]
+dependencies = ["numpy>=1.26", "yt-dlp>=2024.8.6", "websocket-client>=1.7"]
 
 [project.optional-dependencies]
 asr = ["faster-whisper>=1.0"]

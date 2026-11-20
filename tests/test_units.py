@@ -101,3 +101,23 @@ def test_background_chatter_is_not_the_title():
     spike = background[:2] + [(f"v{i}", "no way trailer is real") for i in range(8)]
     s = build_story(spike, [], "C", context=background, context_scale=1.0)
     assert "hello" not in s.title.lower() and ("trailer" in s.title.lower() or "way" in s.title.lower())
+
+
+def test_youtube_discover_uses_search_results_only(cfg):
+    """No per-video lookups: they trigger YouTube's bot check and are slow."""
+    from clipper.discovery.youtube import discover
+    cfg.discovery.queries = ["a", "b"]
+    calls = []
+    entries = [{"id": "L1", "title": "live", "channel_id": "UC1", "channel": "C", "concurrent_view_count": 500,
+                "live_status": "is_live", "availability": None},
+               {"id": "L2", "channel_id": "UC2", "concurrent_view_count": 9000, "live_status": "is_live"},
+               {"id": "U1", "live_status": "is_upcoming", "concurrent_view_count": 99999},
+               {"id": "V1", "live_status": "was_live"}, "garbage", {"no": "id"}]
+
+    def fake(url, flat):
+        calls.append((url, flat))
+        return {"entries": entries}
+
+    out = discover(cfg, fake)
+    assert [s.video_id for s in out] == ["L2", "L1"] and all(f for _, f in calls) and len(calls) == 2
+    assert out[1].channel_id == "UC1" and out[1].meta["is_live"] is True

@@ -61,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(cfg.log_dir)
     db = Database(cfg.db_path)
 
+    from . import ytdlp_opts
+    ytdlp_opts.configure(cfg)
     from .rights import sync_config
     sync_config(db, cfg.rights.allow)
 

@@ -79,6 +79,14 @@ class ReviewCfg:
 
 
 @dataclass
+class YtdlpCfg:
+    # YouTube may demand sign-in ("confirm you're not a bot"), mostly from datacenter IPs.
+    # Provide a cookies.txt exported from a browser (keep it private; it is git-ignored) or a browser name.
+    cookies_file: str = ""
+    cookies_from_browser: str = ""
+
+
+@dataclass
 class RightsCfg:
     # [[rights.allow]] platform = "youtube", channel_id = "UC...", basis = "written-permission", note = "..."
     allow: list[dict] = field(default_factory=list)
@@ -113,6 +121,7 @@ class Config:
     quality: QualityCfg = field(default_factory=QualityCfg)
     review: ReviewCfg = field(default_factory=ReviewCfg)
     rights: RightsCfg = field(default_factory=RightsCfg)
+    ytdlp: YtdlpCfg = field(default_factory=YtdlpCfg)
     email: EmailCfg = field(default_factory=EmailCfg)
     daemon: DaemonCfg = field(default_factory=DaemonCfg)
 

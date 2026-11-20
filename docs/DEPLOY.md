@@ -15,6 +15,11 @@ SMTP user is your Apple ID email. Gmail works the same way with an app password.
 
 Check it: `clipper mail-test` must deliver a test message to `MAIL_TO`.
 
+**YouTube "confirm you're not a bot".** From datacenter/VPS IPs YouTube may refuse yt-dlp. A home connection usually
+works. If you see that error in the logs, export a `cookies.txt` from a browser logged into a *throwaway* Google account
+(not your main one; a cookie file is account access), mount it, and set `[ytdlp] cookies_file = "/app/cookies.txt"`.
+Keep yt-dlp updated. `clipper discover` is a quick connectivity check.
+
 ## 2. Start
 Docker (recommended): `docker compose up -d --build`, then `docker compose logs -f`.
 Without Docker: `pip install -e '.[asr]'`, install ffmpeg, then use `deploy/clipper.service` with systemd.

@@ -70,3 +70,7 @@ max_black_ratio = 0.5
 [review]
 host = "127.0.0.1"
 port = 8765
+
+[ytdlp]                    # only needed if YouTube asks you to sign in ("confirm you're not a bot")
+cookies_file = ""          # path to a cookies.txt (git-ignored; use a throwaway account)
+cookies_from_browser = ""  # or a browser name, e.g. "firefox" (not available inside Docker)

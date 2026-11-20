@@ -77,9 +77,13 @@ added later behind `story.build_story` without touching the rest.
 * **Reaction vs. event.** Chat reacts a few seconds after the event; tune `latency_offset_seconds`.
 * **CPU cost.** Composition is ~realtime-capable on 4 cores; Whisper `small` on CPU is slower than realtime on weak
   machines, so `clipper doctor` picks a smaller model. Candidates are processed sequentially in the runner loop.
-* **Not verified in this build environment:** real YouTube/Twitch connections (network policy), and faster-whisper
-  transcription (model download blocked). Both are covered by parser/unit tests or by feeding synthetic data
-  through the same code, but have not been exercised live.
+* **Tested against the real services (cloud sandbox, 2026-11-20):** YouTube live search (13 s, real ranked GTA 6
+  streams, all blocked by default-deny); Twitch anonymous chat over WebSocket (40 real messages in 6 s); yt-dlp -> ffmpeg
+  capture of a public HLS stream into segments; faster-whisper `base` transcribing real speech (21 words, 3.4 s).
+* **Not verified live:** recording a YouTube stream and YouTube live chat (YouTube answered "Sign in to confirm you're not a
+  bot" from the sandbox's datacenter IP; on a home connection it often works, otherwise set `[ytdlp] cookies_file`);
+  recording a Twitch stream (needs a channel you're cleared to record); SMTP delivery (raw SMTP/IRC ports cannot be
+  resolved from the sandbox; run `clipper mail-test` on your machine).
 
 ## Failure modes handled
 | Failure | Behaviour |

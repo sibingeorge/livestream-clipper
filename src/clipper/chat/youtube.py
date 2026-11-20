@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Iterator
 
 from ..log import get_logger
+from ..ytdlp_opts import cli_args
 from .base import ChatMessage
 
 log = get_logger("chat.youtube")
@@ -37,7 +38,7 @@ def stream_chat(url: str, work_dir, poll: float = 0.5) -> Iterator[ChatMessage]:
     for old in work.glob("chat.live_chat.json*"):
         old.unlink(missing_ok=True)
     proc = subprocess.Popen(
-        ["yt-dlp", "-q", "--no-warnings", "--skip-download", "--write-subs", "--sub-langs", "live_chat",
+        ["yt-dlp", "-q", "--no-warnings", *cli_args(), "--skip-download", "--write-subs", "--sub-langs", "live_chat",
          "-o", str(work / "chat"), url], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     pos, path, idle = 0, None, 0.0
     try:
